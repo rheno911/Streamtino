@@ -1,12 +1,9 @@
-// ============================================================
-//  index.js - Stremio LatAm Addon - Punto de entrada principal
-//  Compatible con Nuvio y Arvio
-// ============================================================
+// index.js
 const { addonBuilder, serveHTTP } = require("stremio-addon-sdk");
 const manifest = require("./manifest");
-const { streamCache, catalogCache } = require("./utils/cache");
+const { streamCache, catalogCache, imdbIdCache } = require("./utils/cache");
 
-// ── Importar todos los scrapers ──────────────────────────────
+// importar scrapers
 const cineby = require("./scrapers/cineby");
 const sololatino = require("./scrapers/sololatino");
 const tioplus = require("./scrapers/tioplus");
@@ -15,13 +12,13 @@ const cinezo = require("./scrapers/cinezo");
 const tubitv = require("./scrapers/tubitv");
 const detodopeliculas = require("./scrapers/detodopeliculas");
 const pelispedia = require("./scrapers/pelispedia");
-const verpeliculasultra = require("./scrapers/verpeliculasultra");
+const verpeliculasultra = require("./scrapers/verpeliculasyseries");
 const latanime = require("./scrapers/latanime");
 const estrenosanime = require("./scrapers/estrenosanime");
 const entrepeliculasyseries = require("./scrapers/entrepeliculasyseries");
 const gnulahd = require("./scrapers/gnulahd");
 
-// Agrupar scrapers por tipo de contenido
+// grupos de scrapers
 const MOVIE_SCRAPERS = [
   cineby, sololatino, tioplus, lamovie, cinezo,
   tubitv, detodopeliculas, pelispedia, verpeliculasultra,
@@ -36,12 +33,30 @@ const SERIES_SCRAPERS = [
 
 const ANIME_SCRAPERS = [latanime, estrenosanime];
 
-// ── Construir el addon ───────────────────────────────────────
+// parser de id (tt123 | latam:source:id)
+function parseId(id) {
+  const prefixMatch = id.match(/^latam:(.+?):(.+?)$/);
+  if (prefixMatch) {
+    return {
+      isLatam: true,
+      source: prefixMatch[1],
+      sourceId: prefixMatch[2],
+    };
+  }
+  const idMatch = id.match(/^(ttd+)(?::(d+):(d+))?$/);
+  if (idMatch) {
+    const imdbId = idMatch[1];
+    const season = idMatch[2] ? parseInt(idMatch[2], 10) : null;
+    const episode = idMatch[3] ? parseInt(idMatch[3], 10) : null;
+    return { imdbId, season, episode, isLatam: false };
+  }
+  return { imdbId: null, season: null, episode: null, isLatam: false };
+}
+
 const builder = new addonBuilder(manifest);
 
-// ============================================================
-//  CATÁLOGO
-// ============================================================
+// ===================== CATALOG =====================
+
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
   const skip = parseInt(extra?.skip || "0", 10);
   const search = extra?.search || "";
@@ -61,10 +76,11 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
     scrapers = SERIES_SCRAPERS;
   }
 
-  // Ejecutar scrapers en paralelo (máx 4 a la vez para no sobrecargar)
   const results = await Promise.allSettled(
     scrapers.map((s) => {
-      if (search && s.search) return s.search(search, type);
+      if (search && s.search) {
+        return s.search(search, type);
+      }
       return s.getCatalog(type, skip);
     })
   );
@@ -76,18 +92,19 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
     }
   }
 
-  // Convertir a formato Stremio meta
   const stremioMetas = metas
     .filter((m) => m && m.name)
     .slice(0, 100)
     .map((m) => ({
-      id: m.id || `latam:${encodeURIComponent(m.name)}`,
+      id: m.id || `latam:${m.source || "unknown"}:${encodeURIComponent(m.name)}`,
       type: m.type || type,
       name: m.name,
       poster: m.poster || m.img || "",
-      year: m.year ? parseInt(m.year) : undefined,
+      year: m.year ? parseInt(m.year, 10) : undefined,
       description: m.source ? `Fuente: ${m.source}` : undefined,
-      links: m.sourceUrl ? [{ name: "Ver en web", category: "stream", url: m.sourceUrl }] : undefined,
+      links: m.sourceUrl ? [
+        { name: "Ver en web", category: "stream", url: m.sourceUrl },
+      ] : undefined,
     }));
 
   const response = { metas: stremioMetas };
@@ -95,9 +112,8 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
   return response;
 });
 
-// ============================================================
-//  STREAM
-// ============================================================
+// ===================== STREAM =====================
+
 builder.defineStreamHandler(async ({ type, id }) => {
   const cacheKey = `stream:${type}:${id}`;
   const cached = streamCache.get(cacheKey);
@@ -105,19 +121,11 @@ builder.defineStreamHandler(async ({ type, id }) => {
 
   console.log(`[Stream] type=${type} id=${id}`);
 
-  // Parsear id: puede ser "tt1234567" o "tt1234567:1:2" para series
-  let imdbId = id;
-  let season = null;
-  let episode = null;
-
-  if (id.includes(":")) {
-    const parts = id.split(":");
-    imdbId = parts[0];
-    season = parseInt(parts[1]) || null;
-    episode = parseInt(parts[2]) || null;
+  const parsed = parseId(id);
+  if (!parsed.isLatam && !parsed.imdbId) {
+    return { streams: [] };
   }
 
-  // Seleccionar scrapers apropiados
   let scrapers = [];
   if (type === "movie") {
     scrapers = MOVIE_SCRAPERS;
@@ -127,9 +135,13 @@ builder.defineStreamHandler(async ({ type, id }) => {
     scrapers = [...MOVIE_SCRAPERS, ...SERIES_SCRAPERS, ...ANIME_SCRAPERS];
   }
 
-  // Ejecutar todos en paralelo y recoger streams
   const results = await Promise.allSettled(
-    scrapers.map((s) => s.getStreams(imdbId, type, season, episode))
+    scrapers.map((s) => {
+      if (parsed.isLatam && s.getSourceIdStreams) {
+        return s.getSourceIdStreams(parsed.sourceId, type, parsed.season, parsed.episode);
+      }
+      return s.getStreams(parsed.imdbId, type, parsed.season, parsed.episode);
+    })
   );
 
   let streams = [];
@@ -139,14 +151,23 @@ builder.defineStreamHandler(async ({ type, id }) => {
     }
   }
 
-  // Filtrar y deduplicar por URL
   const seen = new Set();
-  streams = streams.filter((s) => {
-    if (!s || !s.url) return false;
-    if (seen.has(s.url)) return false;
-    seen.add(s.url);
-    return true;
-  });
+  streams = streams
+    .filter((s) => s && s.url)
+    .map((s) => {
+      if (!seen.has(s.url)) {
+        seen.add(s.url);
+        return {
+          ...s,
+          behaviorHints: {
+            notWebReady: false,
+            bingeGroup: s.source || s.name || null,
+          },
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
 
   console.log(`[Stream] Encontrados ${streams.length} streams para ${id}`);
 
@@ -155,43 +176,50 @@ builder.defineStreamHandler(async ({ type, id }) => {
   return response;
 });
 
-// ============================================================
-//  META (información de la película/serie)
-// ============================================================
+// ===================== META =====================
+
 builder.defineMetaHandler(async ({ type, id }) => {
-  // Para IDs de IMDb, devolvemos meta básica
-  // En producción se podría conectar a TMDB o OMDB
+  const parsed = parseId(id);
+
+  if (parsed.isLatam) {
+    const { source, sourceId } = parsed;
+    const sourceUrl = `https://your-real-source.com/${source}/${encodeURIComponent(sourceId)}`;
+    return {
+      meta: {
+        id,
+        type,
+        name: `Contenido LatAm: ${source}`,
+        description: `Proveniente de ${source}`,
+        links: [
+          { name: "Abrir en web", category: "stream", url: sourceUrl },
+        ],
+      },
+    };
+  }
+
   if (id.startsWith("tt")) {
     return {
       meta: {
         id,
         type,
-        name: id,
+        name: `Contenido ${id}`,
+        description: `Película o serie de IMDb: ${id}`,
       },
     };
   }
 
-  // Para IDs internos, decodificar la URL de la fuente
-  const parts = id.split(":");
-  if (parts.length >= 3) {
-    const sourceUrl = decodeURIComponent(parts.slice(2).join(":"));
-    return {
-      meta: {
-        id,
-        type,
-        name: id,
-        description: `Contenido de: ${sourceUrl}`,
-        links: [{ name: "Abrir en web", category: "stream", url: sourceUrl }],
-      },
-    };
-  }
-
-  return { meta: { id, type, name: id } };
+  return {
+    meta: {
+      id,
+      type,
+      name: id,
+      description: `Meta generada por LatAm Streams`,
+    },
+  };
 });
 
-// ============================================================
-//  SERVIDOR HTTP
-// ============================================================
+// ===================== SERVIDOR =====================
+
 const PORT = process.env.PORT || 7000;
 
 serveHTTP(builder.getInterface(), { port: PORT });
