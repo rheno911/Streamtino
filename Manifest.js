@@ -1,3 +1,4 @@
+// manifest.js
 const manifest = {
   id: "community.stremio-latam-addon",
   version: "1.0.0",
@@ -9,19 +10,25 @@ const manifest = {
     {
       type: "movie",
       id: "latam-movies",
-      name: "LatAm Películas",
+      name: "Películas LatAm",
       extra: [{ name: "search" }, { name: "skip" }],
     },
     {
       type: "series",
       id: "latam-series",
-      name: "LatAm Series",
+      name: "Series LatAm",
       extra: [{ name: "search" }, { name: "skip" }],
     },
     {
       type: "series",
       id: "latam-anime-series",
-      name: "LatAm Anime",
+      name: "Anime LatAm",
+      extra: [{ name: "search" }, { name: "skip" }],
+    },
+    {
+      type: "movie",
+      id: "latam-anime-movies",
+      name: "Películas de Anime",
       extra: [{ name: "search" }, { name: "skip" }],
     },
   ],
