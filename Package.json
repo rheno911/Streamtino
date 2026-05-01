@@ -1,0 +1,19 @@
+{
+  "name": "stremio-latam-addon",
+  "version": "1.0.0",
+  "description": "Stremio Addon Latino para Nuvio y Arvio",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "stremio-addon-sdk": "^1.6.10",
+    "axios": "^1.6.7",
+    "cheerio": "^1.0.0-rc.12",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
