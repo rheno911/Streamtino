@@ -1,34 +1,27 @@
-// manifest.js
 const manifest = {
-  id: "community.stremio-latam-addon",
+  id: "community.streamtino",
   version: "1.0.0",
-  name: "LatAm Streams",
-  description: "Streams en Español Latino - Cineby, SoloLatino, TioPlus, GnulaHD y más.",
+  name: "Streamtino",
+  description: "Streamtino - Streams en Español Latino para Nuvio y Arvio",
   logo: "https://i.imgur.com/LCKlwkZ.png",
   types: ["movie", "series"],
   catalogs: [
     {
       type: "movie",
       id: "latam-movies",
-      name: "Películas LatAm",
+      name: "Streamtino Películas",
       extra: [{ name: "search" }, { name: "skip" }],
     },
     {
       type: "series",
       id: "latam-series",
-      name: "Series LatAm",
+      name: "Streamtino Series",
       extra: [{ name: "search" }, { name: "skip" }],
     },
     {
       type: "series",
       id: "latam-anime-series",
-      name: "Anime LatAm",
-      extra: [{ name: "search" }, { name: "skip" }],
-    },
-    {
-      type: "movie",
-      id: "latam-anime-movies",
-      name: "Películas de Anime",
+      name: "Streamtino Anime",
       extra: [{ name: "search" }, { name: "skip" }],
     },
   ],
