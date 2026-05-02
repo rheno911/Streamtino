@@ -45,7 +45,11 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
   else scrapers = SERIES_SCRAPERS;
 
   const results = await Promise.allSettled(
-    scrapers.map((s) => search && s.search ? s.search(search, type) : s.getCatalog(type, skip))
+    scrapers.map((s) =>
+      search && s.search
+        ? s.search(search, type)
+        : s.getCatalog(type, skip)
+    )
   );
 
   let metas = [];
@@ -120,4 +124,4 @@ builder.defineMetaHandler(async ({ type, id }) => {
 
 const PORT = process.env.PORT || 7000;
 serveHTTP(builder.getInterface(), { port: PORT });
-console.log(`Addon corriendo en puerto ${PORT}`);
+console.log(`🎬 Streamtino corriendo en puerto ${PORT}`);
