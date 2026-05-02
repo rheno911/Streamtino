@@ -1,7 +1,7 @@
 {
-  "name": "stremio-latam-addon",
+  "name": "streamtino",
   "version": "1.0.0",
-  "description": "Stremio Addon Latino para Nuvio y Arvio",
+  "description": "Streamtino - Addon Stremio Latino para Nuvio y Arvio",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
