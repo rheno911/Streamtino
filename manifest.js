@@ -3,7 +3,7 @@ const manifest = {
   version: "1.0.0",
   name: "Streamtino",
   description: "Streamtino - Streams en Español Latino para Nuvio y Arvio",
-  logo: "https://i.imgur.com/LCKlwkZ.png",
+  logo: "https://imgur.com/a/lxcjyku",
   types: ["movie", "series"],
   catalogs: [
     {
